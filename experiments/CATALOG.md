@@ -99,3 +99,16 @@ Measured wall-clock for the full sweep (CPU, float64, double-backward):
 1% 2.2 min, 5% 6.6 min, 10% 12.1 min, 15% 18.1 min, 20% 23.4 min, 25% 29.5 min,
 plus ~1-1.5 min each for evaluation and figures. Runtime scales linearly with the
 retained-row count.
+
+---
+
+## exp2_layerwise — layer-wise spatial sampling x temporal (from `Experiment details.docx`)
+
+Separate, config-driven port of `june16_ffn_signal_reconstruction_(1).py`. Per-layer
+random sampling at {1,10,20,30}% x 3 plies, 10% temporal, evaluate seen + unseen
+points. See `exp2_layerwise/README.md`, `exp2_layerwise/HANDOFF.md` (full state),
+and `exp2_layerwise/HPC_20PCT_COMMANDS.md` (RCI git workflow).
+
+Best config: silu, alpha=3.0, F=256, 256x3, physics@30. Trainer is crash-safe
+(checkpoint + `--resume`) and supports float32 for GPU speed. 20% runs on RCI via
+`exp2_layerwise/run20.sbatch`.
