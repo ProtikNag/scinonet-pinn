@@ -15,10 +15,12 @@
 #SBATCH --error  logs/pinn20-%j.err
 
 export CUDA_VISIBLE_DEVICES=0
-REPO=/work/pnag/PINN              # <-- adjust if the repo lives elsewhere
-cd "$REPO" || exit 1
+# Run from the repo root = the directory you ran `sbatch` from. Location-independent,
+# so the clone dir name (PINN, scinonet-pinn, ...) does not matter. Submit with:
+#   cd /work/pnag/scinonet-pinn && sbatch experiments/exp2_layerwise/run20.sbatch
+cd "${SLURM_SUBMIT_DIR:-$(pwd)}" || exit 1
 mkdir -p logs
-hostname; date
+hostname; date; echo "repo root: $(pwd)"
 
 module load cuda/11.0
 module load python3/anaconda/2023.9
