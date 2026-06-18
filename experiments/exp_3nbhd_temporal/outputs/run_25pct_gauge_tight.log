@@ -1,0 +1,18 @@
+[lvl 25%] held=15 rho=93.72 L=93.7 train_rows=607,078
+
+##### LEVEL 25% - PHYSICS ON (wave + IC, gauge w=1.0) #####
+[pot] device=cpu rho=93.72 chatp0=1.2 chats0=0.6 train_rows=607078 val_rows=2093372 params=216,614
+ep 0001 | data 1.72e+04 | wave 0.00e+00 | gauge 0.00e+00 | ic 0.00e+00 | val 3.31e+02 | best 3.31e+02 | w 0.000 | cp 1.2 cs 0.6
+ep 0008 | data 6.34e+00 | wave 0.00e+00 | gauge 0.00e+00 | ic 0.00e+00 | val 4.69e+00 | best 4.69e+00 | w 0.000 | cp 1.2 cs 0.6
+ep 0016 | data 1.37e-01 | wave 1.77e-01 | gauge 5.87e-02 | ic 6.22e-05 | val 1.69e-01 | best 1.69e-01 | w 0.084 | cp 1.2 cs 0.6
+ep 0024 | data 2.67e-02 | wave 3.30e-02 | gauge 7.50e-03 | ic 3.07e-05 | val 8.11e-02 | best 8.11e-02 | w 0.154 | cp 1.2 cs 0.6
+ep 0032 | data 2.07e-02 | wave 1.55e-02 | gauge 1.42e-03 | ic 4.65e-05 | val 7.94e-02 | best 7.18e-02 | w 0.303 | cp 1.2 cs 0.6
+ep 0040 | data 9.80e-03 | wave 4.84e-03 | gauge 2.22e-04 | ic 4.24e-05 | val 6.10e-02 | best 5.03e-02 | w 0.803 | cp 1.2 cs 0.6
+ep 0048 | data 7.28e-03 | wave 2.40e-03 | gauge 1.63e-04 | ic 8.93e-05 | val 3.88e-02 | best 3.88e-02 | w 1.449 | cp 1.2 cs 0.6
+[pot] done 30.55 min | best val 3.88e-02
+saved: /Users/protiknag/Desktop/PINN/experiments/exp_3nbhd_temporal/outputs/keep_025p0_gauge_tight/loss_curves.png / .svg
+saved: /Users/protiknag/Desktop/PINN/experiments/exp_3nbhd_temporal/outputs/keep_025p0_gauge_tight/plate_layout.png / .svg
+saved: /Users/protiknag/Desktop/PINN/experiments/exp_3nbhd_temporal/outputs/keep_025p0_gauge_tight/temporal_seen_grid.png / .svg
+saved: /Users/protiknag/Desktop/PINN/experiments/exp_3nbhd_temporal/outputs/keep_025p0_gauge_tight/neighborhood_holdout_grid.png / .svg
+saved: /Users/protiknag/Desktop/PINN/experiments/exp_3nbhd_temporal/outputs/keep_025p0_gauge_tight/far_holdout_grid.png / .svg
+[lvl 25%] seen=0.476 nbhd=0.485 far=1.916

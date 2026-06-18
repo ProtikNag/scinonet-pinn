@@ -1,0 +1,297 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage[colorlinks=true,linkcolor=blue!50!black,urlcolor=blue!50!black]{hyperref}
+\usepackage{parskip}
+
+\title{\vspace{-1.5em}SciNoNet: A Helmholtz-Potential Physics-Informed Network\\[-0.2em]
+\large Architecture, Governing Physics, and Loss Functions}
+\author{}
+\date{}
+
+% standardized (hatted) variables
+\newcommand{\xh}{\hat{x}} \newcommand{\yh}{\hat{y}} \newcommand{\zh}{\hat{z}}
+\newcommand{\tht}{\hat{t}}
+\newcommand{\uh}{\hat{u}} \newcommand{\vh}{\hat{v}} \newcommand{\wh}{\hat{w}}
+\newcommand{\phih}{\hat{\phi}} \newcommand{\psih}{\hat{\psi}}
+\newcommand{\cph}{\hat{c}_p} \newcommand{\csh}{\hat{c}_s}
+\newcommand{\dd}[2]{\frac{\partial #1}{\partial #2}}
+\newcommand{\ddd}[2]{\frac{\partial^2 #1}{\partial #2^2}}
+
+\begin{document}
+\maketitle
+\vspace{-3em}
+
+\section{Overview}
+The model reconstructs the three displacement components $u,v,w$ of guided
+elastic (Lamb) waves on an aluminum plate. A neural network predicts four
+\emph{Helmholtz potentials} from the space--time coordinates; the displacement is
+obtained from the potentials by the Helmholtz decomposition, and the potentials
+are constrained to satisfy two scalar wave equations (one longitudinal, one
+shear), a gauge condition, and a rest initial condition. Every quantity is
+expressed in standardized (non-dimensional) variables; Section~\ref{sec:std}
+defines them and Table~\ref{tab:sym} lists every symbol with its value.
+
+\section{Coordinates, fields, and parameters}
+\label{sec:std}
+The physical inputs are the position $(x,y,z)$ in mm and time $t$ in s; the
+outputs are the displacements $(u,v,w)$ in mm. The plate is $300\times200\times2$
+mm with the through-thickness direction $z$. The data are standardized to
+zero-centered, $O(1)$ variables. With sample means $\mu_\bullet$ and standard
+deviations as defined below,
+\begin{equation}
+\xh=\frac{x-\mu_x}{L},\quad \yh=\frac{y-\mu_y}{L},\quad
+\zh=\frac{z-\mu_z}{L},\quad \tht=\frac{t-\mu_t}{s_t},
+\label{eq:coordstd}
+\end{equation}
+where $L$ is a single in-plane length scale used for \emph{all three} spatial
+axes (including $z$), and $s_t$ is the time scale. Using one length $L$ for $z$
+as well (rather than the small plate thickness) keeps the spatial derivatives
+balanced; this is captured by the ratio
+\begin{equation}
+\rho \equiv \frac{L}{L_z},\qquad L_z=L \;\Rightarrow\; \rho=1,
+\end{equation}
+which multiplies every $z$-derivative term below; the equations are written for
+general $\rho$ and reduce to the implemented case at $\rho=1$. The fields are
+standardized by a single common scale $s_f$ (their combined standard deviation):
+\begin{equation}
+\uh=\frac{u}{s_f},\quad \vh=\frac{v}{s_f},\quad \wh=\frac{w}{s_f}.
+\label{eq:fieldstd}
+\end{equation}
+
+\begin{table}[h]
+\centering\small
+\begin{tabular}{lll}
+\toprule
+Symbol & Meaning & Value (this run) \\
+\midrule
+$\mu_x,\mu_y,\mu_z$ & coordinate means & data-dependent \\
+$L$ & in-plane length scale ($=\!\mathrm{std}$ of $x,y$) & $\approx 89$ mm \\
+$L_z$ & through-thickness scale ($=L$) & $\approx 89$ mm \\
+$\rho=L/L_z$ & in-plane/thickness ratio & $1$ \\
+$s_t$ & time scale ($=\!\mathrm{std}$ of $t$) & $\approx 1.73\times10^{-5}$ s \\
+$s_f$ & field scale ($=\!\mathrm{std}$ of $u,v,w$) & $\approx 6.7\times10^{-6}$ mm \\
+$c_p$ & longitudinal (P) wave speed & $6.3\times10^{6}$ mm/s \\
+$c_s$ & shear (S) wave speed & $3.15\times10^{6}$ mm/s \\
+$\cph=c_p s_t/L$ & standardized P speed & $\approx 1.22$ \\
+$\csh=c_s s_t/L$ & standardized S speed & $\approx 0.61$ \\
+$L_f$ & number of Fourier frequencies & $160$ \\
+$\alpha$ & gradient-balancing target ratio & $0.3$ \\
+$w_g,w_i$ & gauge / IC sub-weights & $1,\,1$ \\
+$N_c,N_i$ & collocation / IC batch sizes & $2048,\,1024$ \\
+$\Delta t$ & simulation timestep & $10^{-8}$ s \\
+\bottomrule
+\end{tabular}
+\caption{Symbols and their values.}
+\label{tab:sym}
+\end{table}
+
+\section{Network architecture}
+\label{sec:arch}
+The network maps the standardized coordinates $\mathbf{x}=(\xh,\yh,\zh,\tht)$ to
+the four scalar potentials
+\begin{equation}
+\mathbf{p}(\mathbf{x}) = \big(\phih,\ \psih_x,\ \psih_y,\ \psih_z\big)
+= \mathrm{MLP}\big(\gamma(\mathbf{x})\big),
+\end{equation}
+where $\phih$ is the (dimensionless) scalar potential and
+$\boldsymbol{\psih}=(\psih_x,\psih_y,\psih_z)$ the vector potential.
+
+\paragraph{Fourier-feature embedding.} The coordinates are first lifted by a
+specialized random-Fourier embedding. With a frequency matrix
+$\mathbf{B}\in\mathbb{R}^{4\times L_f}$ (columns $\mathbf{B}_{:,j}$) and a
+per-frequency amplitude $A_j$,
+\begin{equation}
+\gamma(\mathbf{x}) = \Big[\,A_1\sin(2\pi\,\mathbf{x}\!\cdot\!\mathbf{B}_{:,1}),\dots,
+A_{L_f}\sin(2\pi\,\mathbf{x}\!\cdot\!\mathbf{B}_{:,L_f}),\;
+A_1\cos(\cdot),\dots,A_{L_f}\cos(\cdot)\,,\ \mathbf{x}\Big]\in\mathbb{R}^{2L_f+4}.
+\label{eq:rff}
+\end{equation}
+The raw coordinates $\mathbf{x}$ are appended (the trailing term) so the network
+can also represent slow, linear trends. Both $A_j$ and $\mathbf{B}$ are learnable;
+$\mathbf{B}$ is initialized uniformly within and clamped after each step to
+per-dimension bands taken from the wave dispersion curve. In standardized
+cycles-per-unit (a physical frequency $f$ maps to $f\cdot\mathrm{std}$),
+\begin{equation}
+B_{x},B_{y},B_{z}\in[-k_{\max}L,\,k_{\max}L],\qquad B_{t}\in[0,\,f_{\max}s_t],
+\end{equation}
+with $k_{\max}=0.26$ cyc/mm ($=2\times0.13$, the band $\kappa\!\le\!0.8$ rad/mm)
+and $f_{\max}=300$ kHz, giving $|B_{x,y,z}|\!\lesssim\!23$ and $B_t\!\lesssim\!5.2$.
+
+\paragraph{MLP.} The embedding feeds a multilayer perceptron with three hidden
+layers of width $256$ and $\tanh$ activations, ending in a linear layer with four
+outputs (the potentials). The two wave speeds enter as fixed parameters
+$\cph,\csh$ (Section~\ref{sec:phys}); they are stored as learnable
+log-parameters but held fixed here so that $c_p/c_s$ stays at its physical value.
+
+\section{Displacement from the potentials}
+\label{sec:disp}
+The Helmholtz decomposition writes the displacement field as the gradient of the
+scalar potential plus the curl of the vector potential,
+$\mathbf{u}=\nabla\Phi+\nabla\times\boldsymbol{\Psi}$, i.e.
+\begin{equation}
+u=\dd{\Phi}{x}+\dd{\Psi_z}{y}-\dd{\Psi_y}{z},\quad
+v=\dd{\Phi}{y}+\dd{\Psi_x}{z}-\dd{\Psi_z}{x},\quad
+w=\dd{\Phi}{z}+\dd{\Psi_y}{x}-\dd{\Psi_x}{y},
+\label{eq:helm}
+\end{equation}
+where $\Phi,\boldsymbol{\Psi}$ are the \emph{physical} potentials. They are
+related to the network's dimensionless outputs by a single scale $C=s_f L$,
+\begin{equation}
+\Phi=C\,\phih,\qquad \Psi_x=C\,\psih_x,\quad \Psi_y=C\,\psih_y,\quad \Psi_z=C\,\psih_z .
+\end{equation}
+From \eqref{eq:coordstd}, a physical derivative becomes a standardized one through
+the chain rule, $\partial/\partial x=(1/L)\,\partial/\partial\xh$,
+$\partial/\partial z=(1/L_z)\,\partial/\partial\zh$. Substituting into the first
+line of \eqref{eq:helm},
+\begin{align}
+u &= C\Big(\tfrac{1}{L}\phih_{\xh}+\tfrac{1}{L}\psih_{z,\yh}-\tfrac{1}{L_z}\psih_{y,\zh}\Big)
+= \frac{C}{L}\Big(\phih_{\xh}+\psih_{z,\yh}-\tfrac{L}{L_z}\psih_{y,\zh}\Big) \notag\\
+&= s_f\big(\phih_{\xh}+\psih_{z,\yh}-\rho\,\psih_{y,\zh}\big),
+\end{align}
+using $C/L=s_f$. Dividing by $s_f$ gives the standardized displacement the data
+loss compares against (subscripts after a comma denote partial derivatives):
+\begin{equation}
+\boxed{\;
+\uh=\phih_{\xh}+\psih_{z,\yh}-\rho\,\psih_{y,\zh},\quad
+\vh=\phih_{\yh}+\rho\,\psih_{x,\zh}-\psih_{z,\xh},\quad
+\wh=\rho\,\phih_{\zh}+\psih_{y,\xh}-\psih_{x,\yh}.\;}
+\label{eq:disp_std}
+\end{equation}
+All derivatives are obtained by automatic differentiation of the network output.
+
+\section{Governing physics}
+\label{sec:phys}
+
+\subsection{Wave equations and their standardized residual}
+For an isotropic elastic solid the scalar potential carries the longitudinal (P)
+wave at speed $c_p$ and each component of the vector potential carries the shear
+(S) wave at speed $c_s$:
+\begin{equation}
+\ddd{\Phi}{t}=c_p^2\,\nabla^2\Phi,\qquad
+\ddd{\Psi_k}{t}=c_s^2\,\nabla^2\Psi_k\quad(k=x,y,z),
+\label{eq:wave_phys}
+\end{equation}
+with $\nabla^2=\partial_{xx}+\partial_{yy}+\partial_{zz}$. The two fundamental
+Lamb modes (symmetric $S_0$, antisymmetric $A_0$) arise from the superposition of
+$\Phi$ and $\boldsymbol{\Psi}$ through the plate thickness. We derive the
+residual for a generic potential $q\in\{\phih,\psih_x,\psih_y,\psih_z\}$ with
+speed $c\in\{c_p,c_s\}$. Writing the physical potential $Q=C\,q$ and using the
+chain rule on \eqref{eq:wave_phys},
+\begin{align}
+\ddd{Q}{t}=\frac{C}{s_t^2}\,q_{\tht\tht},\qquad
+\nabla^2 Q = C\Big[\tfrac{1}{L^2}(q_{\xh\xh}+q_{\yh\yh})+\tfrac{1}{L_z^2}q_{\zh\zh}\Big].
+\end{align}
+Substituting and cancelling $C$,
+\begin{equation}
+\frac{1}{s_t^2}q_{\tht\tht}
+= c^2\Big[\tfrac{1}{L^2}(q_{\xh\xh}+q_{\yh\yh})+\tfrac{1}{L_z^2}q_{\zh\zh}\Big]
+\;\Longrightarrow\;
+q_{\tht\tht}=\hat c^2\,(q_{\xh\xh}+q_{\yh\yh})+\hat c^2\rho^2\,q_{\zh\zh},
+\end{equation}
+where $\hat c=c\,s_t/L$ is the standardized speed and we used
+$c^2 s_t^2/L^2=\hat c^2$ and $c^2 s_t^2/L_z^2=\hat c^2\rho^2$ (since
+$1/L_z^2=\rho^2/L^2$). Dividing through by $\hat c^2\rho^2$ to keep all terms
+$O(1)$ gives the residual used in the loss,
+\begin{equation}
+\boxed{\;
+r_q \;=\; \frac{1}{\hat c^2\rho^2}\,q_{\tht\tht}
+\;-\;\frac{1}{\rho^2}\big(q_{\xh\xh}+q_{\yh\yh}\big)\;-\;q_{\zh\zh}\;,}
+\label{eq:res}
+\end{equation}
+with $\hat c=\cph$ for $q=\phih$ and $\hat c=\csh$ for the three
+$\psih_k$. At $\rho=1$ this is $r_q=q_{\tht\tht}/\hat c^2-(q_{\xh\xh}+q_{\yh\yh}+q_{\zh\zh})$.
+A solution of the wave equation makes $r_q=0$.
+
+\subsection{Coulomb gauge}
+The vector potential is not unique: $\boldsymbol{\Psi}\!\to\!\boldsymbol{\Psi}+\nabla\chi$
+changes nothing in $\nabla\times\boldsymbol{\Psi}$, hence nothing in $\mathbf u$.
+This freedom is removed by the Coulomb gauge $\nabla\!\cdot\!\boldsymbol{\Psi}=0$.
+In standardized variables,
+\begin{equation}
+\nabla\!\cdot\!\boldsymbol{\Psi}
+=\dd{\Psi_x}{x}+\dd{\Psi_y}{y}+\dd{\Psi_z}{z}
+=\frac{C}{L}\Big(\psih_{x,\xh}+\psih_{y,\yh}+\rho\,\psih_{z,\zh}\Big),
+\end{equation}
+so the (scale-free) gauge residual is
+\begin{equation}
+\boxed{\;g=\psih_{x,\xh}+\psih_{y,\yh}+\rho\,\psih_{z,\zh}\;.}
+\label{eq:gauge}
+\end{equation}
+
+\subsection{Initial condition}
+The plate is at rest before excitation: at $t=0$ the displacement and velocity
+vanish, which (with the gauge) is enforced by requiring the potentials and their
+time-derivatives to vanish on the $t=0$ plane,
+\begin{equation}
+\mathbf{p}\big|_{\tht_0}=\mathbf 0,\qquad
+\dd{\mathbf{p}}{\tht}\Big|_{\tht_0}=\mathbf 0,\qquad
+\tht_0=\frac{0-\mu_t}{s_t}.
+\label{eq:ic}
+\end{equation}
+The eight scalar residuals are stacked into
+$\mathbf{r}_{\mathrm{ic}}=(\,\mathbf{p},\ \partial\mathbf{p}/\partial\tht\,)\in\mathbb{R}^{8}$.
+
+\section{Loss functions}
+\label{sec:loss}
+Let $\{\mathbf{x}_n\}_{n=1}^{N}$ be the data points (with measured displacements
+$\hat{\mathbf u}^{\mathrm{data}}_n$), $\{\mathbf{x}^c_i\}_{i=1}^{N_c}$ collocation
+points sampled uniformly over the standardized domain box for the wave and gauge
+residuals, and $\{\mathbf{x}^{\mathrm{ic}}_i\}_{i=1}^{N_i}$ points on the $t=0$
+plane. Each loss is a mean square.
+
+\paragraph{Data loss.} Compares the displacement \eqref{eq:disp_std} (derived from
+the predicted potentials) to the measurements:
+\begin{equation}
+\mathcal{L}_{\mathrm{data}}=\frac{1}{N}\sum_{n=1}^{N}
+\Big[(\uh-\uh^{\mathrm{data}})_n^2+(\vh-\vh^{\mathrm{data}})_n^2+(\wh-\wh^{\mathrm{data}})_n^2\Big].
+\end{equation}
+
+\paragraph{Wave-residual loss.} Sums the squared residual \eqref{eq:res} over the
+four potentials:
+\begin{equation}
+\mathcal{L}_{\mathrm{wave}}=\frac{1}{N_c}\sum_{i=1}^{N_c}\sum_{q\in\{\phih,\psih_x,\psih_y,\psih_z\}} r_q(\mathbf{x}^c_i)^2 .
+\end{equation}
+
+\paragraph{Gauge loss.} Penalizes departures from $\nabla\!\cdot\!\boldsymbol{\Psi}=0$ via \eqref{eq:gauge}:
+\begin{equation}
+\mathcal{L}_{\mathrm{gauge}}=\frac{1}{N_c}\sum_{i=1}^{N_c} g(\mathbf{x}^c_i)^2 .
+\end{equation}
+
+\paragraph{Initial-condition loss.} Enforces \eqref{eq:ic}:
+\begin{equation}
+\mathcal{L}_{\mathrm{ic}}=\frac{1}{N_i}\sum_{i=1}^{N_i}\big\lVert \mathbf{r}_{\mathrm{ic}}(\mathbf{x}^{\mathrm{ic}}_i)\big\rVert^2
+=\frac{1}{N_i}\sum_{i=1}^{N_i}\sum_{q}\Big(q^2+q_{\tht}^2\Big)\Big|_{\tht_0}.
+\end{equation}
+
+\paragraph{Total loss and gradient-norm balancing.} The physics terms are grouped as
+\begin{equation}
+\mathcal{L}_{\mathrm{phys}}=\mathcal{L}_{\mathrm{wave}}+w_g\,\mathcal{L}_{\mathrm{gauge}}+w_i\,\mathcal{L}_{\mathrm{ic}},
+\qquad
+\mathcal{L}=\mathcal{L}_{\mathrm{data}}+\lambda\,\mathcal{L}_{\mathrm{phys}}.
+\end{equation}
+The physics weight $\lambda$ is set each epoch so that the physics gradient is a
+fixed fraction $\alpha$ of the data gradient (preventing the large second-order
+physics gradients from overwhelming the data fit),
+\begin{equation}
+\lambda^{\star}=\alpha\,\frac{\big\lVert\nabla_\theta\mathcal{L}_{\mathrm{data}}\big\rVert}
+{\big\lVert\nabla_\theta\mathcal{L}_{\mathrm{phys}}\big\rVert},
+\qquad
+\lambda\leftarrow\beta\,\lambda+(1-\beta)\,\lambda^{\star},
+\end{equation}
+where $\theta$ are the network weights, $\nabla_\theta$ the gradient with respect
+to them, $\lVert\cdot\rVert$ the Euclidean norm, and $\beta=0.9$ an
+exponential-moving-average factor. A short data-only warmup ($\lambda=0$ for the
+first $12$ epochs) precedes the physics phase.
+
+\section{Training}
+Optimizer: Adam, learning rate $2\times10^{-3}$, gradient-norm clipping at $1$,
+and a plateau learning-rate schedule. All derivatives (first order for the
+displacement, second order for the wave residual) use automatic differentiation
+in double precision. The best model is the one with the lowest validation data
+loss. Data and collocation are drawn in minibatches (data batch $16384$).
+
+\end{document}

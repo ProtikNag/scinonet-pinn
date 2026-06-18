@@ -1,0 +1,3 @@
+===== PHYSICS-WEIGHT SWEEP  14:23:43 =====
+neighborhood column: none found, using a single group
+[sweep] 3 alphas x 25 epochs | device=cpu train_rows=1,061,316

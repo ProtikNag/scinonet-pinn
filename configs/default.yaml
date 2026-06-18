@@ -1,0 +1,50 @@
+# Default configuration for the data-only Fourier reconstruction baseline.
+# All hyperparameters live here; training scripts contain no magic numbers.
+
+seed: 42
+device: auto                 # auto | cpu | cuda | mps
+
+data:
+  csv: data/dataset_100_neighbor_fullsignal_6001steps.csv
+  # Train/test construction:
+  #   shared    -> every point keeps the same windows (wide data-free gaps; needs physics)
+  #   mixed     -> half points keep windows, half keep the complement (full temporal coverage)
+  #   subsample -> each point keeps a random fraction of timesteps (small gaps; easy)
+  split_mode: mixed
+  subsample_keep: 0.5
+  # Kept training time-index windows; complement is the held-out test set.
+  time_ranges:
+    - [20, 280]
+    - [900, 1100]
+    - [1800, 3000]
+    - [4000, 5500]
+    - [5990, 6000]
+
+features:
+  num_frequencies: 256
+  # Bandwidth derived from wave physics (see features.bandwidth_from_physics).
+  f_max_temporal_hz: 217.0e3       # ~99% temporal energy band
+  f_max_spatial_per_mm: 0.05       # ~1 / 20 mm shear wavelength
+  spatial_scale: 3.0               # tuning multiplier on spatial bandwidth
+  temporal_scale: 1.0              # tuning multiplier on temporal bandwidth
+
+model:
+  hidden_sizes: [256, 256, 256, 256]
+  activation: gelu
+  concat_raw: true
+
+train:
+  epochs: 400
+  batch_size: 16384
+  lr: 2.0e-3
+  weight_decay: 0.0
+  grad_clip: 1.0
+  scheduler_factor: 0.5
+  scheduler_patience: 12
+  min_lr: 1.0e-5
+  early_stop_patience: 80
+  log_every: 20
+
+output:
+  recon_points: [0, 10, 25, 50, 75]   # point indices to plot
+  recon_components: [u, v, w]

@@ -1,0 +1,30 @@
+# ── Python ────────────────────────────────────────────────
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.DS_Store
+venv/
+.venv/
+envs/
+
+# ── Large raw data and generated datasets (regenerable from the .mat) ──
+*.mat
+data/*.csv
+experiments/**/data/*.csv
+
+# ── Model weights and checkpoints (large; regenerable) ──
+*.pt
+
+# ── Archives ──
+*.tgz
+*.tar.gz
+
+# ── HPC job logs (kept under logs/ or as job*.out/err) ──
+job*.out
+job*.err
+logs/
+*.sbatch.log
+
+# Tracked on purpose: scripts, *.md, config.json, metrics.json, progress.csv,
+# *_meta.json, search.csv/json, and figures (*.png/*.svg) so results + state
+# travel with the repo for the next session.

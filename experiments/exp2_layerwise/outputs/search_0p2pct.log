@@ -1,0 +1,54 @@
+neighborhood column: none found, using a single group
+[search] device=cpu train_rows=197,814 xy_points=120 held=10 beta_z=105.5
+
+[phase 1] activation x alpha (4x3 trials)
+  [tanh a=0.3 F=160 h=256x256x256] val=2.368e-02 unseen=1.279 seen=0.322 (8.6m)
+  [tanh a=1.0 F=160 h=256x256x256] val=4.197e-02 unseen=1.161 seen=0.420 (8.4m)
+  [tanh a=3.0 F=160 h=256x256x256] val=1.245e-01 unseen=1.230 seen=0.726 (8.5m)
+  [ sin a=0.3 F=160 h=256x256x256] val=1.728e-02 unseen=1.298 seen=0.314 (9.4m)
+  [ sin a=1.0 F=160 h=256x256x256] val=2.713e-02 unseen=1.177 seen=0.377 (9.4m)
+  [ sin a=3.0 F=160 h=256x256x256] val=8.828e-02 unseen=1.097 seen=0.579 (9.3m)
+  [gelu a=0.3 F=160 h=256x256x256] val=5.701e-03 unseen=1.332 seen=0.163 (12.1m)
+  [gelu a=1.0 F=160 h=256x256x256] val=1.384e-02 unseen=1.193 seen=0.282 (12.1m)
+  [gelu a=3.0 F=160 h=256x256x256] val=3.813e-02 unseen=1.107 seen=0.466 (12.1m)
+  [silu a=0.3 F=160 h=256x256x256] val=8.830e-03 unseen=1.328 seen=0.213 (12.1m)
+  [silu a=1.0 F=160 h=256x256x256] val=1.596e-02 unseen=1.156 seen=0.306 (12.1m)
+  [silu a=3.0 F=160 h=256x256x256] val=4.038e-02 unseen=1.070 seen=0.479 (12.1m)
+
+[phase 1 best] activation=silu alpha=3.0 unseen=1.070 seen=0.479
+
+[phase 2] architecture sweep at act=silu alpha=3.0
+  [silu a=3.0 F=96  h=256x256x256] val=1.037e-01 unseen=1.087 seen=0.660 (10.6m)
+  [silu a=3.0 F=256 h=256x256x256] val=2.602e-02 unseen=1.077 seen=0.369 (13.9m)
+  [silu a=3.0 F=160 h=128x128x128] val=9.512e-02 unseen=1.088 seen=0.657 (8.5m)
+  [silu a=3.0 F=160 h=256x256x256x256] val=6.206e-02 unseen=1.098 seen=0.545 (14.5m)
+
+[search] ranked (best first):
+ phase activation  alpha  num_freq          hidden  val_data_mse  unseen_median  seen_median       wave
+     1       silu    3.0       160     256x256x256      0.040383       1.069644     0.478757  45.786441
+     2       silu    3.0       256     256x256x256      0.026022       1.076558     0.369120  17.909686
+     2       silu    3.0        96     256x256x256      0.103666       1.087002     0.660407  58.955393
+     2       silu    3.0       160     128x128x128      0.095123       1.088321     0.656845  45.102171
+     1        sin    3.0       160     256x256x256      0.088279       1.097431     0.579497  32.424882
+     2       silu    3.0       160 256x256x256x256      0.062060       1.097848     0.544597  35.231425
+     1       gelu    3.0       160     256x256x256      0.038131       1.107408     0.466384  14.958429
+     1       silu    1.0       160     256x256x256      0.015956       1.156019     0.305790  90.687422
+     1       tanh    1.0       160     256x256x256      0.041972       1.161045     0.419637  87.900753
+     1        sin    1.0       160     256x256x256      0.027126       1.176889     0.377429  69.424410
+     1       gelu    1.0       160     256x256x256      0.013840       1.192735     0.282115  62.431064
+     1       tanh    3.0       160     256x256x256      0.124546       1.229969     0.726205  29.681507
+     1       tanh    0.3       160     256x256x256      0.023684       1.279142     0.322083 216.986828
+     1        sin    0.3       160     256x256x256      0.017282       1.298054     0.314306 164.417873
+     1       silu    0.3       160     256x256x256      0.008830       1.327963     0.212982 345.268608
+     1       gelu    0.3       160     256x256x256      0.005701       1.332110     0.163428 312.260440
+
+[search] RECOMMENDED config: {
+  "activation": "silu",
+  "alpha": 3.0,
+  "num_freq": 160,
+  "hidden": "256x256x256",
+  "unseen_median": 1.069644384552472,
+  "seen_median": 0.47875709865181376,
+  "val_data_mse": 0.0403831830585535
+}
+[search] -> outputs/search_dataset_layerwise_0p2pct_3ply_fullsignal_6001steps/

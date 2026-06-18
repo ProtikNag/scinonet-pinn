@@ -1,0 +1,14 @@
+{
+  "pct": 0.2,
+  "seed": 42,
+  "budget_points": 120,
+  "n_unique_xy": 120,
+  "n_boundary": 24,
+  "n_interior": 96,
+  "n_plies": 3,
+  "n_spatial_points": 360,
+  "rows": 2160360,
+  "boundary_frac": 0.2,
+  "edge_tol_mm": 0.6,
+  "csv": "experiments/exp2_layerwise/data/dataset_layerwise_0p2pct_3ply_fullsignal_6001steps.csv"
+}

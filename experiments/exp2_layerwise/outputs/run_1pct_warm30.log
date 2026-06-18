@@ -1,0 +1,30 @@
+[run] tag=sp1_t10_silu_F256_h256x256x256_a3_warm30 device=cpu csv=dataset_layerwise_1pct_3ply_fullsignal_6001steps.csv
+neighborhood column: none found, using a single group
+[run] beta_y=1.424 beta_z=112.044 gamma=0.508 train_rows=1,061,316 test_rows=9,560,454 xy_points=600 held=10
+[train] device=cpu beta_y=1.424 beta_z=112.044 gamma=0.508 act=silu alpha=3.0 bdry=on params=266,245
+ep 0001 | data 9.18e-01 | wave 0.00e+00 | gauge 0.00e+00 | ic 0.00e+00 | bdry 0.00e+00 | val 5.01e-01 | best 5.01e-01 | w 0.000 | bad 0
+ep 0005 | data 9.50e-02 | wave 0.00e+00 | gauge 0.00e+00 | ic 0.00e+00 | bdry 0.00e+00 | val 8.64e-02 | best 8.64e-02 | w 0.000 | bad 0
+ep 0010 | data 2.91e-02 | wave 0.00e+00 | gauge 0.00e+00 | ic 0.00e+00 | bdry 0.00e+00 | val 3.14e-02 | best 3.14e-02 | w 0.000 | bad 0
+ep 0015 | data 1.41e-02 | wave 0.00e+00 | gauge 0.00e+00 | ic 0.00e+00 | bdry 0.00e+00 | val 1.38e-02 | best 1.38e-02 | w 0.000 | bad 0
+ep 0020 | data 9.93e-03 | wave 0.00e+00 | gauge 0.00e+00 | ic 0.00e+00 | bdry 0.00e+00 | val 9.95e-03 | best 9.95e-03 | w 0.000 | bad 0
+ep 0025 | data 7.53e-03 | wave 0.00e+00 | gauge 0.00e+00 | ic 0.00e+00 | bdry 0.00e+00 | val 7.45e-03 | best 7.45e-03 | w 0.000 | bad 0
+ep 0030 | data 7.60e-03 | wave 0.00e+00 | gauge 0.00e+00 | ic 0.00e+00 | bdry 0.00e+00 | val 7.28e-03 | best 7.23e-03 | w 0.000 | bad 2
+ep 0035 | data 2.18e-02 | wave 4.94e+02 | gauge 1.42e-01 | ic 1.78e-05 | bdry 1.13e-01 | val 2.71e-02 | best 7.23e-03 | w 0.000 | bad 7
+ep 0040 | data 4.91e-02 | wave 1.85e+02 | gauge 5.18e-02 | ic 4.79e-05 | bdry 7.09e-02 | val 5.72e-02 | best 7.23e-03 | w 0.000 | bad 12
+ep 0045 | data 6.16e-02 | wave 7.53e+01 | gauge 2.77e-02 | ic 4.55e-05 | bdry 4.58e-02 | val 6.08e-02 | best 7.23e-03 | w 0.001 | bad 17
+ep 0050 | data 1.01e-01 | wave 5.15e+01 | gauge 1.95e-02 | ic 1.23e-04 | bdry 3.65e-02 | val 1.11e-01 | best 7.23e-03 | w 0.002 | bad 22
+ep 0055 | data 1.22e-01 | wave 3.82e+01 | gauge 1.33e-02 | ic 8.91e-05 | bdry 2.79e-02 | val 1.31e-01 | best 7.23e-03 | w 0.003 | bad 27
+ep 0060 | data 2.46e-01 | wave 2.32e+01 | gauge 7.60e-03 | ic 6.03e-05 | bdry 1.78e-02 | val 2.42e-01 | best 7.23e-03 | w 0.010 | bad 32
+ep 0065 | data 2.45e-01 | wave 1.57e+01 | gauge 5.81e-03 | ic 2.70e-04 | bdry 1.67e-02 | val 2.33e-01 | best 7.23e-03 | w 0.013 | bad 37
+early stop 68 (train loss plateau 40)
+[train] done 107.37 min | best val 7.23e-03 | epochs 68
+saved: /Users/protiknag/Desktop/PINN/experiments/exp2_layerwise/outputs/sp1_t10_silu_F256_h256x256x256_a3_warm30/plate_layout.png / .svg
+saved: /Users/protiknag/Desktop/PINN/experiments/exp2_layerwise/outputs/sp1_t10_silu_F256_h256x256x256_a3_warm30/loss_data.png / .svg
+saved: /Users/protiknag/Desktop/PINN/experiments/exp2_layerwise/outputs/sp1_t10_silu_F256_h256x256x256_a3_warm30/loss_wave.png / .svg
+saved: /Users/protiknag/Desktop/PINN/experiments/exp2_layerwise/outputs/sp1_t10_silu_F256_h256x256x256_a3_warm30/loss_gauge.png / .svg
+saved: /Users/protiknag/Desktop/PINN/experiments/exp2_layerwise/outputs/sp1_t10_silu_F256_h256x256x256_a3_warm30/loss_ic.png / .svg
+saved: /Users/protiknag/Desktop/PINN/experiments/exp2_layerwise/outputs/sp1_t10_silu_F256_h256x256x256_a3_warm30/loss_bdry.png / .svg
+saved: /Users/protiknag/Desktop/PINN/experiments/exp2_layerwise/outputs/sp1_t10_silu_F256_h256x256x256_a3_warm30/loss_total.png / .svg
+saved: /Users/protiknag/Desktop/PINN/experiments/exp2_layerwise/outputs/sp1_t10_silu_F256_h256x256x256_a3_warm30/reconstruction.png / .svg
+saved: /Users/protiknag/Desktop/PINN/experiments/exp2_layerwise/outputs/sp1_t10_silu_F256_h256x256x256_a3_warm30/heldout_prediction.png / .svg
+[run] DONE sp1_t10_silu_F256_h256x256x256_a3_warm30 | epochs_run=68 | unseen(spatial) median=1.2376812823868795 | seen(temporal) median=0.13680092959588053
