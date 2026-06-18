@@ -120,7 +120,13 @@ def main():
     P.BATCH_SIZE = args.batch_size
     P.EPOCHS = args.epochs
     P.EARLY_STOP_PATIENCE = args.patience
-    P.EARLY_STOP_METRIC = "train"
+    # Stop on the *validation* data loss (the held-out metric we report and the one
+    # best_state is kept by), not the combined train loss. Monitoring train_total
+    # is unreliable once physics turns on: it includes phys_w*phys, so it jumps at
+    # the data->physics switch and the warmup data-loss minimum becomes unbeatable,
+    # making the plateau counter climb for structural reasons rather than real
+    # stagnation. val_data is comparable across the switch and self-corrects.
+    P.EARLY_STOP_METRIC = "val"
     P.DATA_ONLY_EPOCHS = args.data_only_epochs
     P.BDRY_ENABLE = bool(args.bdry)
     P.DROP_DATA_AFTER_WARMUP = bool(args.drop_data_after_warmup)

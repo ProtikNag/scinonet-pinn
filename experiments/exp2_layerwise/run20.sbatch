@@ -33,11 +33,17 @@ if [ ! -f "$CSV" ]; then
   python -u experiments/exp2_layerwise/scripts/gen_layerwise_dataset.py --pct 20
 fi
 
-# Best config: silu, alpha=3.0, F=256, 256x3, 10% temporal, physics@30, patience 180.
-# float32 for speed on the V100 (switch to float64 if the wave residual misbehaves).
+# Config: silu, F=256, 256x3, 10% temporal, physics@30, patience 50 (early-stop on val).
+# alpha=1.0 (not 3.0): the gradient-norm balancer scales the physics gradient to
+#   alpha x the data gradient each step. At alpha=3.0 physics dominated 3:1 and drove
+#   the data fit *uphill* on the 20% set (val 1.6e-2 -> 8e-2 over 16 epochs); 1.0
+#   balances them so physics regularizes without destroying the fit.
+# float64 (not float32): the wave residual uses 2nd-order autograd (q_tt, q_xx, ...);
+#   float32 noise there amplified the imbalance above. float64 is ~2x slower but sane
+#   (the HANDOFF flagged exactly this fallback). Resume covers any 48h wall overrun.
 python -u experiments/exp2_layerwise/scripts/run_exp.py \
     --csv "$CSV" --activation silu --num-freq 256 --hidden 256 256 256 \
-    --balance-alpha 3.0 --temporal 0.10 \
-    --data-only-epochs 30 --epochs 2000 --patience 180 \
-    --dtype float32 --ckpt-every 5 --resume --tag-suffix _hpc
+    --balance-alpha 1.0 --temporal 0.10 \
+    --data-only-epochs 30 --epochs 2000 --patience 50 \
+    --dtype float64 --ckpt-every 5 --resume --tag-suffix _hpc
 date
