@@ -169,6 +169,7 @@ def main():
 
     # cheap figures first (plate + loss curves)
     P.plot_plate_nbhd(data, save_stem=os.path.join(out, "plate_layout"),
+                      centers=meta.get("centers_xy"),
                       title=f"Neighborhood sampling ({pct}% train, {n_nbhd} neighborhoods)")
     P.plot_loss_curves(history, P.DATA_ONLY_EPOCHS, save_stem=os.path.join(out, "loss"))
 
@@ -176,6 +177,17 @@ def main():
     eval_metrics = evaluate(model, data, device, args.seed)
     out_metrics = {**metrics, "eval": eval_metrics}
     json.dump(out_metrics, open(os.path.join(out, "metrics.json"), "w"), indent=2)
+
+    # results table: interpolation (unseen inside) vs extrapolation (unseen outside)
+    P.plot_results_table([{
+        "name": f"PINN ({args.activation}, F{args.num_freq}, "
+                f"{'x'.join(str(h) for h in args.hidden)}, a={args.balance_alpha:g})",
+        "e_r": "wave (phi,psi) + gauge + IC",
+        "e_b": "Dirichlet u=v=w=0" if args.bdry else "None",
+        "recon": eval_metrics["seen_temporal"],
+        "interp": eval_metrics["unseen_inside"],
+        "extrap": eval_metrics["unseen_outside"],
+    }], save_stem=os.path.join(out, "results_table"))
     torch.save({"state_dict": model.state_dict(), "history": history,
                 "metrics": out_metrics, "config": config,
                 "scalers": vars(sc)}, os.path.join(out, "model.pt"))

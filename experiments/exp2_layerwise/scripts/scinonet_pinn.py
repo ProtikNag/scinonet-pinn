@@ -840,45 +840,190 @@ def plot_plate(data, save_stem=None, title="Sampled points on the 300 x 200 mm p
     plt.close(fig)
 
 
-def plot_plate_nbhd(data, save_stem=None,
+def _nbhd_centers_radii(xy, nbhd_of_point, centers=None):
+    """Per-neighborhood center and enclosing radius from member points.
+
+    `centers` (optional, e.g. from the dataset meta) overrides the centroid; the
+    radius is always the farthest member from the center (+ a small pad) so the
+    drawn circle encloses the whole neighborhood.
+    """
+    ids = sorted(int(g) for g in set(nbhd_of_point) if int(g) >= 0)
+    out = {}
+    for k, g in enumerate(ids):
+        m = np.where(nbhd_of_point == g)[0]
+        if len(m) == 0:
+            continue
+        c = (np.asarray(centers[k]) if centers is not None and k < len(centers)
+             else xy[m].mean(axis=0))
+        r = float(np.max(np.hypot(xy[m, 0] - c[0], xy[m, 1] - c[1]))) + 1.0
+        out[g] = (np.asarray(c, float), r)
+    return out
+
+
+def _arrow_axes(ax, plate_xlim, plate_ylim, pad_x, pad_y):
+    """Draw x/y axes as arrows offset OUTSIDE the plate (concept-diagram style)."""
+    x0, x1 = plate_xlim; y0, y1 = plate_ylim
+    ax_y = y0 - 0.45 * pad_y          # x-axis sits below the plate
+    ax_x = x0 - 0.45 * pad_x          # y-axis sits left of the plate
+    ax.annotate("", xy=(x1 + 0.25 * pad_x, ax_y), xytext=(x0 - 0.05 * pad_x, ax_y),
+                arrowprops=dict(arrowstyle="-|>", color=AC["axis"], lw=2.2))
+    ax.annotate("", xy=(ax_x, y1 + 0.25 * pad_y), xytext=(ax_x, y0 - 0.05 * pad_y),
+                arrowprops=dict(arrowstyle="-|>", color=AC["axis"], lw=2.2))
+    ax.text((x0 + x1) / 2, ax_y - 0.16 * pad_y, "x  (300 mm)", ha="center",
+            va="top", fontsize=16, color=AC["axis"])
+    ax.text(ax_x - 0.16 * pad_x, (y0 + y1) / 2, "y  (200 mm)", ha="right",
+            va="center", rotation=90, fontsize=16, color=AC["axis"])
+
+
+def plot_plate_nbhd(data, save_stem=None, centers=None, zoom_nbhd=None,
                     title="Neighborhood sampling on the 300 x 200 mm plate",
                     plate_xlim=(-149.5, 149.5), plate_ylim=(-199.5, -0.5)):
-    """Plate footprint for Experiment 2 (same style as ``plot_plate``).
+    """Two-panel plate figure for Experiment 2.
 
-    Train points inside neighborhoods (blue), unseen points held out INSIDE the
-    neighborhoods (amber diamonds), and unseen points OUTSIDE every neighborhood
-    (red diamonds). Faint circles mark each neighborhood for context.
+    Left  — the whole plate: a filled footprint with the axes drawn as separate
+            arrows outside it, every neighborhood outlined as a circle, and small
+            markers for train / unseen-inside / unseen-outside points.
+    Right — a zoom into one neighborhood on the 1 mm grid, showing which points
+            were trained on (blue) and which were held out inside it (amber).
     """
-    xy = data["xy_points"]; n = len(xy)
-    inside_held = set(data.get("inside_held_idx", []))
-    outside_held = set(data.get("outside_held_idx", []))
+    xy = np.asarray(data["xy_points"]); n = len(xy)
+    nbhd = np.asarray(data["nbhd_of_point"])
+    inside_held = set(int(i) for i in data.get("inside_held_idx", []))
+    outside_held = set(int(i) for i in data.get("outside_held_idx", []))
     held = inside_held | outside_held
     is_train = np.array([i not in held for i in range(n)])
     in_h = np.array([i in inside_held for i in range(n)])
     out_h = np.array([i in outside_held for i in range(n)])
+    cr = _nbhd_centers_radii(xy, nbhd, centers)
 
-    fig, ax = plt.subplots(figsize=(10, 8))
-    ax.add_patch(plt.Rectangle((plate_xlim[0], plate_ylim[0]),
-                               plate_xlim[1] - plate_xlim[0],
-                               plate_ylim[1] - plate_ylim[0],
-                               fill=False, edgecolor=AC["axis"], lw=1.8))
-    ax.scatter(xy[is_train, 0], xy[is_train, 1], s=22, color=AC["blue"],
-               label=f"train (in neighborhood) ({int(is_train.sum())})", zorder=3)
+    # pick the neighborhood to zoom: the one with the most held-inside points
+    if zoom_nbhd is None:
+        cand = {g: int(((nbhd == g) & in_h).sum()) for g in cr}
+        zoom_nbhd = max(cand, key=cand.get) if cand else (min(cr) if cr else None)
+
+    fig, (axL, axR) = plt.subplots(1, 2, figsize=(20, 8),
+                                   gridspec_kw={"width_ratios": [1.55, 1.0]})
+
+    # ── left: overall plate with separated arrow-axes ──
+    px = plate_xlim[1] - plate_xlim[0]; py = plate_ylim[1] - plate_ylim[0]
+    axL.add_patch(plt.Rectangle((plate_xlim[0], plate_ylim[0]), px, py,
+                                facecolor="#EAF2FB", edgecolor=AC["axis"], lw=1.8, zorder=1))
+    for g, (c, r) in cr.items():
+        axL.add_patch(plt.Circle(c, r, fill=False, edgecolor=AC["red"],
+                                 lw=2.0 if g == zoom_nbhd else 1.4,
+                                 ls="-" if g == zoom_nbhd else (0, (4, 3)), zorder=4))
+    axL.scatter(xy[is_train, 0], xy[is_train, 1], s=5, color=AC["blue"],
+                label=f"train (in neighborhood) ({int(is_train.sum())})", zorder=3)
     if in_h.any():
-        ax.scatter(xy[in_h, 0], xy[in_h, 1], s=120, color=AC["amber"], marker="D",
-                   edgecolor="white", lw=0.8,
-                   label=f"unseen inside ({int(in_h.sum())})", zorder=5)
+        axL.scatter(xy[in_h, 0], xy[in_h, 1], s=26, color=AC["amber"], marker="D",
+                    edgecolor="white", lw=0.5,
+                    label=f"unseen inside ({int(in_h.sum())})", zorder=6)
     if out_h.any():
-        ax.scatter(xy[out_h, 0], xy[out_h, 1], s=120, color=AC["red"], marker="D",
-                   edgecolor="white", lw=0.8,
-                   label=f"unseen outside ({int(out_h.sum())})", zorder=5)
-    ax.set_xlabel("x [mm]", fontsize=26); ax.set_ylabel("y [mm]", fontsize=26)
-    ax.set_title(title, fontsize=28); ax.tick_params(axis="both", labelsize=20)
-    ax.set_aspect("equal", adjustable="box")
-    ax.legend(frameon=False, fontsize=16, loc="upper right")
+        axL.scatter(xy[out_h, 0], xy[out_h, 1], s=26, color=AC["red"], marker="D",
+                    edgecolor="white", lw=0.5,
+                    label=f"unseen outside ({int(out_h.sum())})", zorder=6)
+    _arrow_axes(axL, plate_xlim, plate_ylim, px, py)
+    axL.set_xlim(plate_xlim[0] - 0.55 * px, plate_xlim[1] + 0.30 * px)
+    axL.set_ylim(plate_ylim[0] - 0.55 * py, plate_ylim[1] + 0.30 * py)
+    axL.set_aspect("equal", adjustable="box"); axL.axis("off")
+    axL.set_title(title, fontsize=24)
+    axL.legend(frameon=False, fontsize=15, loc="lower right")
+
+    # ── right: zoom into one neighborhood (1 mm grid, keep ticks) ──
+    if zoom_nbhd is not None and zoom_nbhd in cr:
+        c, r = cr[zoom_nbhd]; pad = r * 1.45
+        sel = (nbhd == zoom_nbhd)
+        zt = sel & is_train; zh = sel & in_h
+        axR.add_patch(plt.Circle(c, r, fill=False, edgecolor=AC["red"], lw=2.0, zorder=2))
+        axR.scatter(xy[zt, 0], xy[zt, 1], s=70, color=AC["blue"],
+                    label=f"train ({int(zt.sum())})", zorder=3)
+        if zh.any():
+            axR.scatter(xy[zh, 0], xy[zh, 1], s=150, color=AC["amber"], marker="D",
+                        edgecolor=AC["axis"], lw=0.8,
+                        label=f"unseen inside ({int(zh.sum())})", zorder=4)
+        axR.set_xlim(c[0] - pad, c[0] + pad); axR.set_ylim(c[1] - pad, c[1] + pad)
+        axR.set_aspect("equal", adjustable="box")
+        axR.set_xlabel("x [mm]", fontsize=22); axR.set_ylabel("y [mm]", fontsize=22)
+        axR.tick_params(axis="both", labelsize=16)
+        axR.set_title("Zoom: one neighborhood (1 mm grid)", fontsize=24)
+        axR.legend(frameon=False, fontsize=15, loc="upper right")
+    else:
+        axR.axis("off")
+
     fig.tight_layout()
     save_fig(fig, save_stem)
     plt.close(fig)
+
+
+def plot_results_table(rows, save_stem=None,
+                       title="Table 1: Interpolation vs extrapolation error (relative-L2)",
+                       caption=("Relative-L2 of the full-signal reconstruction. Interpolation = "
+                                "unseen points INSIDE the neighborhoods; Extrapolation = unseen "
+                                "points OUTSIDE every neighborhood. Median over points (mean in "
+                                "parentheses).")):
+    """Render a results table (docx Experiment-2 style) and save .png/.svg/.tex/.csv.
+
+    Each entry in `rows` is a dict with keys:
+        name, e_r, e_b, recon, interp, extrap
+    where recon/interp/extrap are themselves dicts {median, mean} (or None).
+    """
+    cols = ["Name", "$E_r$ (PDE residual)", "$E_b$ (boundary)",
+            "Recon error\n(seen)", "Interp. error\n(unseen inside)",
+            "Extrap. error\n(unseen outside)"]
+    col_w = [0.25, 0.21, 0.15, 0.12, 0.135, 0.135]
+
+    def cell(s):
+        if s is None:
+            return "--"
+        return f"{s['median']:.3f} ({s['mean']:.3f})"
+
+    table = [[r["name"], r["e_r"], r["e_b"], cell(r.get("recon")),
+              cell(r.get("interp")), cell(r.get("extrap"))] for r in rows]
+
+    fig, ax = plt.subplots(figsize=(17, 2.0 + 0.8 * len(rows)))
+    ax.axis("off")
+    tb = ax.table(cellText=table, colLabels=cols, colWidths=col_w,
+                  loc="center", cellLoc="center")
+    tb.auto_set_font_size(False); tb.set_fontsize(13)
+    for (i, j), c in tb.get_celld().items():
+        c.set_height(0.30 if i == 0 else 0.20)       # taller header for 2-line labels
+        c.set_edgecolor("#C9CED3")
+        if i == 0:
+            c.set_text_props(weight="bold", color="white"); c.set_facecolor(AC["axis"])
+        else:
+            c.set_facecolor("#F4F6F8" if i % 2 else "white")
+            if j == 0:
+                c.set_text_props(ha="left"); c.PAD = 0.04
+            if j >= 4:                               # highlight interp/extrap columns
+                c.set_text_props(weight="bold")
+    ax.set_title(title, fontsize=21, pad=24)
+    fig.text(0.5, 0.04, caption, ha="center", va="bottom", fontsize=12,
+             color=AC["muted"], wrap=True)
+    fig.subplots_adjust(left=0.02, right=0.98, top=0.82, bottom=0.18)
+    save_fig(fig, save_stem)
+    plt.close(fig)
+
+    if save_stem:
+        # LaTeX (booktabs) + CSV siblings for the report
+        def tex_cell(s):
+            return "--" if s is None else f"${s['median']:.3f}$ (${s['mean']:.3f}$)"
+        with open(f"{save_stem}.tex", "w") as f:
+            f.write("\\begin{center}\n\\begin{tabular}{lll ccc}\n\\toprule\n")
+            f.write("Name & $E_r$ & $E_b$ & Recon (seen) & "
+                    "Interp.\\ error & Extrap.\\ error \\\\\n\\midrule\n")
+            for r in rows:
+                f.write(f"{r['name']} & {r['e_r']} & {r['e_b']} & {tex_cell(r.get('recon'))} & "
+                        f"{tex_cell(r.get('interp'))} & {tex_cell(r.get('extrap'))} \\\\\n")
+            f.write("\\bottomrule\n\\end{tabular}\n\\end{center}\n")
+        with open(f"{save_stem}.csv", "w") as f:
+            f.write("name,E_r,E_b,recon_median,recon_mean,interp_median,interp_mean,"
+                    "extrap_median,extrap_mean\n")
+            for r in rows:
+                def md(s): return ("", "") if s is None else (f"{s['median']:.6f}", f"{s['mean']:.6f}")
+                rc, ic, ec = md(r.get("recon")), md(r.get("interp")), md(r.get("extrap"))
+                f.write(f"\"{r['name']}\",\"{r['e_r']}\",\"{r['e_b']}\","
+                        f"{rc[0]},{rc[1]},{ic[0]},{ic[1]},{ec[0]},{ec[1]}\n")
+        print(f"saved: {save_stem}.tex / .csv")
 
 
 def reconstruct_xy(model, data, xy_index, z, device, n_t=N_T):
