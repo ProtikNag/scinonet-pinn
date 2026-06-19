@@ -1,0 +1,28 @@
+{
+  "csv": "experiments/exp3_neighborhood/data/dataset_nbhd_1pct_n6_3ply_fullsignal_6001steps.csv",
+  "experiment": "neighborhood",
+  "pct_train": 1.0,
+  "n_nbhd": 6,
+  "temporal_keep": 0.1,
+  "activation": "silu",
+  "num_freq": 256,
+  "hidden": [
+    256,
+    256,
+    256
+  ],
+  "balance_alpha": 1.0,
+  "epochs_cap": 2000,
+  "patience": 50,
+  "data_only_epochs": 30,
+  "bdry": true,
+  "dtype": "float64",
+  "batch_size": 16384,
+  "seed": 42,
+  "beta_y": 1.7412949335628363,
+  "beta_z": 88.58073737175744,
+  "gamma": 0.5079365079365079,
+  "train_rows": 1080057,
+  "n_inside_held": 150,
+  "n_outside_held": 150
+}
