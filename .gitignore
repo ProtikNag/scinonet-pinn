@@ -20,9 +20,14 @@ experiments/**/data/*.csv
 *.tar.gz
 
 # ── HPC job logs (kept under logs/ or as job*.out/err) ──
+# Ignore the log files but KEEP the logs/ directory itself (via logs/.gitkeep):
+# Slurm opens --output logs/...%j.out at job launch, before the job script can
+# mkdir it, so the dir must already exist after a fresh clone or the job dies
+# instantly with no output.
 job*.out
 job*.err
-logs/
+logs/*
+!logs/.gitkeep
 *.sbatch.log
 
 # Tracked on purpose: scripts, *.md, config.json, metrics.json, progress.csv,

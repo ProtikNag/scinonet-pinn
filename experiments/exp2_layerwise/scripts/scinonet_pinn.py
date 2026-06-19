@@ -317,6 +317,75 @@ def build_dataset(df, subsample_keep, n_held_spatial, seed):
             "colloc_lo": colloc_lo, "colloc_hi": colloc_hi, "t0_std": t0_std}
 
 
+def build_dataset_nbhd(df, subsample_keep, seed, role_col="role"):
+    """Experiment-2 dataset builder honoring a predefined ``role`` column.
+
+    Unlike :func:`build_dataset` (which derives a random spatial holdout), the split
+    is baked into the data by the neighborhood generator:
+
+        role=train         -> training pool (temporally subsampled at `subsample_keep`)
+        role=inside_held   -> unseen point INSIDE a neighborhood  (full-signal holdout)
+        role=outside_held  -> unseen point OUTSIDE every neighborhood (full-signal holdout)
+
+    Returns the same dict shape as ``build_dataset`` plus ``inside_held_idx`` /
+    ``outside_held_idx`` (indices into ``xy_points``), so every existing plotting /
+    reconstruction helper works unchanged.
+    """
+    df = df.copy()
+    if role_col not in df.columns:
+        raise ValueError(f"build_dataset_nbhd needs a '{role_col}' column")
+    xy_df = (df[["x", "y", NBHD_COL, "is_boundary", role_col]]
+             .drop_duplicates(subset=["x", "y"]).sort_values(["x", "y"]).reset_index(drop=True))
+    xy_points = xy_df[["x", "y"]].to_numpy()
+    nbhd_of_point = xy_df[NBHD_COL].to_numpy()
+    is_boundary_point = xy_df["is_boundary"].to_numpy().astype(bool)
+    roles = xy_df[role_col].to_numpy().astype(str)
+    z_values = np.sort(df["z"].unique())
+
+    inside_held_idx = np.where(roles == "inside_held")[0].tolist()
+    outside_held_idx = np.where(roles == "outside_held")[0].tolist()
+    held_idx = sorted(inside_held_idx + outside_held_idx)
+
+    # stage 1: a point is spatially held out iff it is not a training-pool point
+    is_train_pool = (roles == "train")
+    train_keys = set(map(tuple, xy_points[is_train_pool]))
+    point_key = list(zip(df["x"].to_numpy(), df["y"].to_numpy()))
+    held_spatial = np.array([k not in train_keys for k in point_key])
+    df["held_spatial"] = held_spatial
+
+    # stage 2: temporal subsample on the training-pool points only
+    rng = np.random.RandomState(seed + 1)
+    keep = (rng.rand(len(df)) < subsample_keep) & (~held_spatial)
+    df["is_train"] = keep
+
+    tr = df[keep]
+    te = df[(~keep) & (~held_spatial)]          # seen spatial, unseen temporal (validation)
+    if len(te) > MAX_TEST_ROWS:
+        te = te.sample(n=MAX_TEST_ROWS, random_state=seed + 2)
+    sc = PotentialScalers.fit(tr, CP_MM_PER_S, CS_MM_PER_S)
+
+    def to_xy(frame):
+        X = sc.encode(frame["x"].to_numpy(), frame["y"].to_numpy(),
+                      frame["z"].to_numpy(), frame["t"].to_numpy())
+        Y = frame[FIELD_COLS].to_numpy() / sc.s_f
+        return torch.tensor(X, dtype=DTYPE), torch.tensor(Y, dtype=DTYPE)
+
+    Xtr, Ytr = to_xy(tr)
+    Xte, Yte = to_xy(te)
+    allc = sc.encode(df["x"].to_numpy(), df["y"].to_numpy(),
+                     df["z"].to_numpy(), df["t"].to_numpy())
+    colloc_lo = torch.tensor(allc.min(0), dtype=DTYPE)
+    colloc_hi = torch.tensor(allc.max(0), dtype=DTYPE)
+    t0_std = float((0.0 - sc.mu_t) / sc.tau)
+    return {"Xtr": Xtr, "Ytr": Ytr, "Xte": Xte, "Yte": Yte, "scalers": sc,
+            "xy_points": xy_points, "nbhd_of_point": nbhd_of_point,
+            "is_boundary_point": is_boundary_point,
+            "held_spatial_idx": held_idx, "inside_held_idx": sorted(inside_held_idx),
+            "outside_held_idx": sorted(outside_held_idx),
+            "z_values": z_values, "df": df,
+            "colloc_lo": colloc_lo, "colloc_hi": colloc_hi, "t0_std": t0_std}
+
+
 # ── Fourier features ────────────────────────────────────────────────────────────
 class SpecializedFourierFeatures(nn.Module):
     def __init__(self, lo, hi, num_frequencies, seed=0):
@@ -766,6 +835,47 @@ def plot_plate(data, save_stem=None, title="Sampled points on the 300 x 200 mm p
     ax.tick_params(axis="both", labelsize=20)
     ax.set_aspect("equal", adjustable="box")
     ax.legend(frameon=False, fontsize=18, loc="upper right")
+    fig.tight_layout()
+    save_fig(fig, save_stem)
+    plt.close(fig)
+
+
+def plot_plate_nbhd(data, save_stem=None,
+                    title="Neighborhood sampling on the 300 x 200 mm plate",
+                    plate_xlim=(-149.5, 149.5), plate_ylim=(-199.5, -0.5)):
+    """Plate footprint for Experiment 2 (same style as ``plot_plate``).
+
+    Train points inside neighborhoods (blue), unseen points held out INSIDE the
+    neighborhoods (amber diamonds), and unseen points OUTSIDE every neighborhood
+    (red diamonds). Faint circles mark each neighborhood for context.
+    """
+    xy = data["xy_points"]; n = len(xy)
+    inside_held = set(data.get("inside_held_idx", []))
+    outside_held = set(data.get("outside_held_idx", []))
+    held = inside_held | outside_held
+    is_train = np.array([i not in held for i in range(n)])
+    in_h = np.array([i in inside_held for i in range(n)])
+    out_h = np.array([i in outside_held for i in range(n)])
+
+    fig, ax = plt.subplots(figsize=(10, 8))
+    ax.add_patch(plt.Rectangle((plate_xlim[0], plate_ylim[0]),
+                               plate_xlim[1] - plate_xlim[0],
+                               plate_ylim[1] - plate_ylim[0],
+                               fill=False, edgecolor=AC["axis"], lw=1.8))
+    ax.scatter(xy[is_train, 0], xy[is_train, 1], s=22, color=AC["blue"],
+               label=f"train (in neighborhood) ({int(is_train.sum())})", zorder=3)
+    if in_h.any():
+        ax.scatter(xy[in_h, 0], xy[in_h, 1], s=120, color=AC["amber"], marker="D",
+                   edgecolor="white", lw=0.8,
+                   label=f"unseen inside ({int(in_h.sum())})", zorder=5)
+    if out_h.any():
+        ax.scatter(xy[out_h, 0], xy[out_h, 1], s=120, color=AC["red"], marker="D",
+                   edgecolor="white", lw=0.8,
+                   label=f"unseen outside ({int(out_h.sum())})", zorder=5)
+    ax.set_xlabel("x [mm]", fontsize=26); ax.set_ylabel("y [mm]", fontsize=26)
+    ax.set_title(title, fontsize=28); ax.tick_params(axis="both", labelsize=20)
+    ax.set_aspect("equal", adjustable="box")
+    ax.legend(frameon=False, fontsize=16, loc="upper right")
     fig.tight_layout()
     save_fig(fig, save_stem)
     plt.close(fig)
