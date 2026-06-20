@@ -1,0 +1,47 @@
+{
+  "experiment": "neighborhood",
+  "pct_train": 10.0,
+  "seed": 42,
+  "budget_train_points": 6000,
+  "n_nbhd": 6,
+  "inside_per_nbhd": 1250,
+  "inside_held_frac": 0.2,
+  "r_typ_mm": 19.86399408992611,
+  "min_sep_mm": 51.646384633807884,
+  "center_margin_mm": 18.0,
+  "n_train_xy": 6000,
+  "n_inside_held_xy": 1500,
+  "n_outside_held_xy": 150,
+  "n_unique_xy": 7650,
+  "n_plies": 3,
+  "n_spatial_points": 22950,
+  "rows": 137722950,
+  "centers_xy": [
+    [
+      -34.499999999999986,
+      -165.5
+    ],
+    [
+      -125.5,
+      -63.5
+    ],
+    [
+      103.50000000000001,
+      -34.5
+    ],
+    [
+      -61.5,
+      -55.5
+    ],
+    [
+      -126.5,
+      -135.5
+    ],
+    [
+      109.50000000000001,
+      -86.50000000000001
+    ]
+  ],
+  "edge_tol_mm": 0.6,
+  "csv": "experiments/exp3_neighborhood/data/dataset_nbhd_10pct_n6_3ply_fullsignal_6001steps.csv"
+}
