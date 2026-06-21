@@ -70,6 +70,7 @@ def main():
     ap.add_argument("--out", required=True, help="run dir with model.pt + config.json")
     ap.add_argument("--mat", default="data/3D_Pristine.mat")
     ap.add_argument("--timesteps", type=int, nargs="+", default=[300, 3000, 5800])
+    ap.add_argument("--cmap", default="viridis", help="matplotlib colormap name")
     ap.add_argument("--which", choices=["best", "current"], default="best")
     args = ap.parse_args()
 
@@ -116,53 +117,56 @@ def main():
         pred["u"][:, j], pred["v"][:, j], pred["w"][:, j] = p[:, 0], p[:, 1], p[:, 2]
         print(f"[field]  predicted step {T}", flush=True)
 
-    # ── figure: rows = u/v/w, cols = [Actual, Predicted] per timestep ──────────────
+    # ── one figure PER timestep: rows = u/v/w, cols = [Actual, Predicted] ──────────
     fields = ["u", "v", "w"]
     field_lbl = {"u": "$u$  (x-disp.)", "v": "$v$  (y-disp.)", "w": "$w$  (z-disp., out-of-plane)"}
-    ncol = 2 * len(Ts)
-    fig, axes = plt.subplots(3, ncol, figsize=(4.6 * ncol, 11.0), squeeze=False)
-    cmap = plt.get_cmap("RdBu_r")
+    cmap = plt.get_cmap(args.cmap)
     extent = [X_MIN - 0.5, X_MAX + 0.5, Y_MIN - 0.5, Y_MAX + 0.5]
+    pct = cfg.get("pct_spatial", "?")
 
-    for r, comp in enumerate(fields):
-        # symmetric, zero-centered scale shared across actual & predicted, all timesteps
-        vmax = np.nanmax(np.abs([gt[comp], pred[comp]]))
-        vmax = vmax if vmax > 0 else 1.0
-        im = None
-        for j, T in enumerate(Ts):
+    for j, T in enumerate(Ts):
+        fig, axes = plt.subplots(3, 2, figsize=(11.5, 13.5), squeeze=False)
+        for r, comp in enumerate(fields):
+            # viridis is sequential -> scale to the field's data range, shared by
+            # actual & predicted so the two columns are directly comparable.
+            both = np.concatenate([gt[comp][:, j], pred[comp][:, j]])
+            vmin, vmax = float(np.nanmin(both)), float(np.nanmax(both))
+            if vmin == vmax:
+                vmin, vmax = vmin - 1e-30, vmax + 1e-30
+            im = None
             for k, (src, tag) in enumerate(((gt, "Actual"), (pred, "Predicted"))):
-                ax = axes[r][2 * j + k]
+                ax = axes[r][k]
                 g = _to_grid(src[comp][:, j], x, y)
                 im = ax.imshow(g, origin="lower", extent=extent, cmap=cmap,
-                               vmin=-vmax, vmax=vmax, aspect="equal", interpolation="nearest")
+                               vmin=vmin, vmax=vmax, aspect="equal", interpolation="nearest")
                 if r == 0:
-                    t_us = (T + 1) * dt * 1e6
-                    ax.set_title(f"step {T}  ({t_us:.2f} µs)\n{tag}", fontsize=18, pad=10)
+                    ax.set_title(tag, fontsize=20, pad=10)
                 if r == 2:
-                    ax.set_xlabel("x [mm]", fontsize=16)
-                if 2 * j + k == 0:
-                    ax.set_ylabel(f"{field_lbl[comp]}\n\ny [mm]", fontsize=17)
+                    ax.set_xlabel("x [mm]", fontsize=17)
+                if k == 0:
+                    ax.set_ylabel(f"{field_lbl[comp]}\n\ny [mm]", fontsize=18)
                 else:
                     ax.set_yticklabels([])
-                ax.tick_params(labelsize=13)
-        # one colorbar per field row
-        cax = fig.add_axes([0.92, 0.655 - 0.305 * r, 0.013, 0.22])
-        cb = fig.colorbar(im, cax=cax)
-        cb.ax.tick_params(labelsize=12)
-        fmt = ScalarFormatter(useMathText=True); fmt.set_powerlimits((-2, 2))
-        cb.ax.yaxis.set_major_formatter(fmt)
-        cb.set_label("displacement [mm]", fontsize=13)
+                ax.tick_params(labelsize=14)
+            # one colorbar per field row
+            cax = fig.add_axes([0.88, 0.665 - 0.300 * r, 0.018, 0.22])
+            cb = fig.colorbar(im, cax=cax)
+            cb.ax.tick_params(labelsize=13)
+            fmt = ScalarFormatter(useMathText=True); fmt.set_powerlimits((-2, 2))
+            cb.ax.yaxis.set_major_formatter(fmt)
+            cb.set_label("displacement [mm]", fontsize=14)
 
-    name = (f"{cfg.get('pct_spatial', '?')}% layer-wise PINN  —  layer 1 (z = 0) full-field "
-            f"reconstruction:  actual vs predicted")
-    fig.suptitle(name, fontsize=22, y=0.99)
-    fig.subplots_adjust(left=0.07, right=0.90, top=0.88, bottom=0.07, wspace=0.08, hspace=0.20)
+        t_us = (T + 1) * dt * 1e6
+        fig.suptitle(f"{pct}% layer-wise PINN — layer 1 (z = 0) full-field reconstruction\n"
+                     f"timestep {T}  (t = {t_us:.2f} µs):  actual vs predicted",
+                     fontsize=21, y=0.985)
+        fig.subplots_adjust(left=0.10, right=0.85, top=0.90, bottom=0.06, wspace=0.05, hspace=0.18)
 
-    stem = os.path.join(args.out, "field_reconstruction")
-    fig.savefig(f"{stem}.png", dpi=220, facecolor="white", bbox_inches="tight")
-    fig.savefig(f"{stem}.svg", facecolor="white", bbox_inches="tight")
-    plt.close(fig)
-    print(f"saved: {stem}.png / .svg", flush=True)
+        stem = os.path.join(args.out, f"field_reconstruction_t{T}")
+        fig.savefig(f"{stem}.png", dpi=220, facecolor="white", bbox_inches="tight")
+        fig.savefig(f"{stem}.svg", facecolor="white", bbox_inches="tight")
+        plt.close(fig)
+        print(f"saved: {stem}.png / .svg", flush=True)
 
     # report per-field relative-L2 over the full layer at each timestep
     for comp in fields:
